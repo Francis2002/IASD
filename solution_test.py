@@ -238,6 +238,7 @@ class FleetProblem(search.Problem):
                         if projectedTime >= request[0]:
                             possibleActions.append(["Pickup", V.index(vehicle), R.index(request), projectedTime])
                         #second case: vehicle waits for pickup, meaning that action timestamp is equal to request timestamp > vehicle["lastLocationTimeStamp"] + (time from vehicle location to request pickup location)
+                        
                         projectedTime = request[0]
                         #only valid if request pickup time is greater than vehicle["lastLocationTimeStamp"] + (time from vehicle location to request pickup location)
                         if projectedTime > vehicle[2] + self.timeMatrix[vehicle[1]][pickUpPointIndex]:
@@ -272,12 +273,10 @@ class FleetProblem(search.Problem):
         if(action[0] == "Pickup"):
             delay = action[3] - request[0]
             return c + delay
-        else:
+        else: # action[0] == "Dropoff"
             Tod = self.timeMatrix[request[1]][request[2]]
-            for v in state1[0]:
-                if v[3] != None:
-                    delay = action[3] - request[5] - Tod
-                    return c + delay
+            delay = action[3] - request[5] - Tod
+            return c + delay
         
 
     def cost(self, sol):
