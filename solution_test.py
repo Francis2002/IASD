@@ -87,8 +87,7 @@ class FleetProblem(search.Problem):
             R.append((r[0], int(r[1]), int(r[2]), int(r[3]), "Pickup", None))
         R = tuple(R)
         T = 0
-        P = None
-        self.initial = (V, R, T, P)
+        self.initial = (V, R, T)
         pass
 
     def readP(self, fh, pLine):
@@ -168,11 +167,6 @@ class FleetProblem(search.Problem):
         #state timestamp equals action timestamp
         newT = action[3]
         #add action to path
-        if state[3] != None:
-            newP = list(state[3])
-            newP.append(action)
-        else:
-            newP = [action,]
         if action[0] == "Pickup":
 
             #if vehicle request list is empty, simply create list with a single entry
@@ -193,6 +187,10 @@ class FleetProblem(search.Problem):
         else:
     
             #convert to list and remove completed request from vehicle list
+
+
+
+
             originalRequest = newR[requestFulfilledIndex]
             newV[vehicleInUseIndex][3].remove((originalRequest[0], originalRequest[1], originalRequest[2], originalRequest[3], "Pickup", None))
             #at the end convert back to tuple so that it is hashable
@@ -210,20 +208,25 @@ class FleetProblem(search.Problem):
             if newV[i][3] != None:
                 newV[i][3] = tuple(newV[i][3])
             newV[i] = tuple(newV[i])
-        if newP != None:
-            for i in range(len(newP)):
-                newP[i] = tuple(newP[i])
         newV = tuple(newV)
         newR = tuple(newR)
-        newP = tuple(newP)
-        newState = (newV, newR, newT, newP)
+        newState = (newV, newR, newT)
+
+
+
+
+
+
         return newState
     
     def actions(self, state):
         V = state[0]
         R = state[1]
         T = state[2]
-        P = state[3]
+
+
+
+    
         possibleActions = []
         for request in R:
             if request[4] == "Pickup":
@@ -238,7 +241,6 @@ class FleetProblem(search.Problem):
                         if projectedTime >= request[0]:
                             possibleActions.append(["Pickup", V.index(vehicle), R.index(request), projectedTime])
                         #second case: vehicle waits for pickup, meaning that action timestamp is equal to request timestamp > vehicle["lastLocationTimeStamp"] + (time from vehicle location to request pickup location)
-                        
                         projectedTime = request[0]
                         #only valid if request pickup time is greater than vehicle["lastLocationTimeStamp"] + (time from vehicle location to request pickup location)
                         if projectedTime > vehicle[2] + self.timeMatrix[vehicle[1]][pickUpPointIndex]:
@@ -246,6 +248,8 @@ class FleetProblem(search.Problem):
             if request[4] == "Dropoff":
                 for vehicle in V:
                     #the only vehicle capable of preforming a request with "Dropoff" status is the vehicle with the corresponding request with "Pickup" status in its requestList
+
+
                     if vehicle[3] != None:
                         if (request[0], request[1], request[2], request[3], "Pickup", None) in vehicle[3]:
                             #check if vehicle can reach the pickup location after request has been triggered
@@ -256,6 +260,8 @@ class FleetProblem(search.Problem):
                             if projectedTime >= request[0]:
                                 possibleActions.append(["Dropoff", V.index(vehicle), R.index(request), projectedTime])
         possibleActions = tuple(possibleActions)
+
+
         return possibleActions
                 
     def goal_test(self, state):
@@ -269,14 +275,21 @@ class FleetProblem(search.Problem):
 
     def path_cost(self, c, state1, action, state2):
         request = state1[1][action[2]]
-    
+
         if(action[0] == "Pickup"):
             delay = action[3] - request[0]
             return c + delay
-        else: # action[0] == "Dropoff"
+        else:
             Tod = self.timeMatrix[request[1]][request[2]]
-            delay = action[3] - request[5] - Tod
-            return c + delay
+
+
+
+            for v in state1[0]:
+                if v[3] != None:
+
+                    delay = action[3] - request[5] - Tod
+
+                    return c + delay
         
 
     def cost(self, sol):
@@ -292,7 +305,7 @@ class FleetProblem(search.Problem):
         except Exception as e:
             print(e)
         except:
-            print("Error with provided solution.")
+            print("No dropoff actions in provided solution.")
             sys.exit(1)
 
         #iterate through sol list of tuples and calculate total cost
@@ -306,6 +319,9 @@ class FleetProblem(search.Problem):
             pickUpPointIndex = actionRequest[1]
             dropOffPointIndex = actionRequest[2]
             Tod = self.timeMatrix[int(pickUpPointIndex)][int(dropOffPointIndex)]
+
+
+
 
             dr = td - t - Tod
 
