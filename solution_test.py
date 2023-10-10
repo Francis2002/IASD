@@ -279,17 +279,20 @@ class FleetProblem(search.Problem):
         if(action[0] == "Pickup"):
             delay = action[3] - request[0]
             return c + delay
+        
         else:
             Tod = self.timeMatrix[request[1]][request[2]]
+            delay = action[3] - request[5] - Tod
+            return c + delay
+        """ else:
+            Tod = self.timeMatrix[request[1]][request[2]] 
 
-
-
-            for v in state1[0]:
+              for v in state1[0]:
                 if v[3] != None:
 
                     delay = action[3] - request[5] - Tod
 
-                    return c + delay
+                    return c + delay """
         
 
     def cost(self, sol):
