@@ -7,13 +7,11 @@ import itertools
 
 import search
 
-# TODO: Add current_time updates to heuristic. This will involve:
-#       - sorting each chain so that requests with the same next point are in group
-#       - checking if location changed when iterating through requests in chain
-#       - if location changed, update current_time to the time it takes to go from last location to current location
-#       - should remain admissible:
-#           - since we are assuming we have infinite vehicles with infinite capacity
-#           - we are not accounting for dropoff actions that will appear after completing pickups
+# TODO: Check guidelines and conventions that the teacher wants us to follow
+
+# TODO: Put counters inside for loops to remove the use of the index() method, which is expensive
+
+# TODO: Replace list and tuple member access with getters and setters, that is replace request[0] with request.getTime() for example
 
 #=======================================================================================================================================
 
@@ -40,8 +38,6 @@ class FleetProblem(search.Problem):
     numberOfVehicles = None
 
     initial = None
-
-    standardTimeUnit = 0
 
     #Methods 
 
@@ -83,21 +79,6 @@ class FleetProblem(search.Problem):
             else:
                 raise Exception("Invalid file format.")
             currentLine = self.readLines(fh)
-        
-        #standard time unit is the avegare time to go from one point to another, not counting the zeros in the time matrix
-        #calculate standard time unit
-        numberOfNonZeroElements = 0
-        sumOfNonZeroElements = 0
-        for i in range(len(self.timeMatrix)):
-            for j in range(len(self.timeMatrix[i])):
-                if self.timeMatrix[i][j] != 0:
-                    numberOfNonZeroElements += 1
-                    sumOfNonZeroElements += self.timeMatrix[i][j]
-        self.standardTimeUnit = sumOfNonZeroElements / numberOfNonZeroElements
-        #standard time unit adjustment
-        self.standardTimeUnit = self.standardTimeUnit * 1
-
-        #create initial state
         V = []
         for v in self.vehicleList:
             V.append((int(v), 0, 0))
@@ -255,146 +236,83 @@ class FleetProblem(search.Problem):
                 return False
         return True
     
-    def getNextPointLocation(self, R, requestIndex):
-        if R[requestIndex][4] == "Pickup":
-            return R[requestIndex][1]
-        elif R[requestIndex][4] == "Dropoff":
-            return R[requestIndex][2]
-        else:
-            return None
-    
     def h(self, state):
         current_state = state.state
         V = current_state[0]
         R = current_state[1]
 
-        #calculate current time by iterating through vehicles and getting the maximum timestamp
-        currentTime = 0
-        for vehicle in V:
-            if vehicle[2] > currentTime:
-                currentTime = vehicle[2]
-
-        #create chains of requests that have the next stage (pickup or dropoff) point in proximity, that is:
+        #create chains of requests that have the next stage (pickup or dropoff) point in common, that is:
         #if a request has status "Pickup", the next point is the pickup point
         #if a request has status "Dropoff", the next point is the dropoff point
         #if a request has status "Completed", it has no next point
-        #chains must have requests where the next point is in both time and location proximity as another request's next point
-        #proximity in time means that the difference between the request time and the next point time is less than the standard time unit
+        #chains must have requests where the next point is the same as another request's next point
         #we must have in mind that pickup actions can only be done if the request time is less than the pickup action timestamp
-        #we must have in mind that dropoff actions can only be done if the corresponding pickup action has been done
 
-        #create list of requests in proximity
-        #on each index, we have a list of requests that are in proximity with the request in the index
-        requestsInProximity = []
-        for i in range(len(R)):
-            requestsInProximity.append([])
-        for i in range(len(R)):
-            #determine next point for requests index i
-            inextPoint = self.getNextPointLocation(R, i)
-            for j in range(len(R)):
-                #determine next point for requests index j
-                jnextPoint = self.getNextPointLocation(R, j)
-                #check if requests are in proximity
-                if i != j and inextPoint != None and jnextPoint != None:
-                    #check if next points are in proximity
-                    if self.timeMatrix[inextPoint][jnextPoint] == 0.0:
-                        requestsInProximity[i].append(j)
-        
-        #for each location proximity list, remove requests that are not in time proximity
-        #create minimum request execution time list
-        minimumRequestExecutionTime = [None]*len(R)
-        for i in range(len(R)):
-            #if request is pickup, minimum execution time is the request time, but only if the request time is more than the current time
-            if R[i][4] == "Pickup":
-                if R[i][0] > currentTime:
-                    minimumRequestExecutionTime[i] = R[i][0]
-                else:
-                    minimumRequestExecutionTime[i] = currentTime
-            #if request is dropoff, minimum execution time is the current time
-            elif R[i][4] == "Dropoff":
-                minimumRequestExecutionTime[i] = currentTime
-        
-        #for each location proximity list, remove requests that are not in time proximity
-        for index, requestList in enumerate(requestsInProximity):
-            for requestIndex in requestList:
-                if abs(minimumRequestExecutionTime[requestIndex] - minimumRequestExecutionTime[index]) > self.standardTimeUnit:
-                    requestsInProximity[index].remove(requestIndex)
-        
-        #now we have lists of requests that are in proximity
-        #we must now create chains of requests that are in proximity
-        #a chain is a list of requests where consecutive requests are in proximity with each other
-        #we must create the longest possible chains
-        
         #create list of chains
         chains = []
-        #create list of requests that have already been added to a chain
-        requestsAlreadyAdded = []
-        #iterate through requests
-        for i in range(len(R)):
-            #if request has not been added to a chain yet
-            if i not in requestsAlreadyAdded:
-                #check if request can be added to an existing chain
-                #iterate through chains
-                for chain in chains:
-                    #check if request is in proximity with last request in chain
-                    if i in requestsInProximity[chain[-1]]:
-                        #add request to chain
-                        chain.append(i)
-                        #add request to list of requests that have already been added to a chain
-                        requestsAlreadyAdded.append(i)
-                        break
-                #if request cannot be added to an existing chain, create new chain
-                if i not in requestsAlreadyAdded:
-                    chains.append([i])
-                    requestsAlreadyAdded.append(i)
+        current_requests_location_list = [] #[1, 1,1,1,1,2,2,2,22,3,3,3,3,3]
+        for rindex, request in enumerate(R):
+            if request[4] == "Pickup":
+                current_requests_location_list.append((request[1], rindex))
+                current_requests_location_list.append((request[2], rindex))
+            elif request[4] == "Dropoff":
+                current_requests_location_list.append((request[2], rindex))
+        #sort list by request location
+        current_requests_location_list.sort(key=lambda x: x[0])
+        #create chains: if two requests have the same location, they are the same element of a chain
+        current_chain = []
+        current_location = None
+        #iterate over list of requests sorted by location, meaning that requests with the same location will be next to each other
+        for request_location in current_requests_location_list:
+            if current_location == None:
+                current_location = request_location[0]
+                current_chain.append(request_location[1])
+            elif current_location == request_location[0]:
+                current_chain.append(request_location[1])
+            #each chain has only requests with the same location
+            else:
+                chains.append(current_chain)
+                current_chain = []
+                current_location = request_location[0]
+                current_chain.append(request_location[1])
+        chains.append(current_chain) #[[1,1,1,1,][2,2,2,2,2,][3,3,3,3,3]]
 
-        #sort requests in each chain by location of next point
-        #baba sort
+        #calculate current time from vehicle times
+        current_time = 0
+        for vehicle in V:
+            if vehicle[2] > current_time:
+                current_time = vehicle[2]
+
+        #try all possible orders of chains and chose the sequence of chains that minimizes the cost of the solution
+        #create list of all possible orders of chains
+        possible_orders = []
         for chain in chains:
-            for request in chain:
-                nextPoint = self.getNextPointLocation(R, request)
-                if nextPoint != None:
-                    for i in range(len(chain)):
-                        if i != request:
-                            inextPoint = self.getNextPointLocation(R, i)
-                            if inextPoint != None:
-                                if self.timeMatrix[nextPoint][inextPoint] < self.timeMatrix[nextPoint][nextPoint]:
-                                    chain[i], chain[request] = chain[request], chain[i]
-                                    break
+            possible_orders.append(chain)
+        possible_orders = list(itertools.permutations(possible_orders))
 
-        #now we have a list of chains
-        #we must now calculate the cost of completing every chain
+        order_costs = []
+        #calculate the cost of each chain
+        for order in possible_orders:
+            chain_costs = []
+            for chain in order:
+                #sort chain by request time
+                chain.sort(key=lambda x: R[x][0])
+                #calculate cost of chain
+                chain_cost = 0
+                for request in chain:
+                    if R[request][4] == "Pickup":
+                        chain_cost += current_time - R[request][0]
+                    elif R[request][4] == "Dropoff":
+                        chain_cost += current_time - R[request][5] - self.timeMatrix[R[request][1]][R[request][2]]
+                chain_costs.append(chain_cost)
+            #sum all chain costs to get the cost of the solution
+            order_cost = 0
+            for chain_cost in chain_costs:
+                order_cost += chain_cost
+            order_costs.append(order_cost)
 
-        #save current time
-        originalCurrentTime = currentTime
-        #create list of chain costs
-        chainCosts = []
-        #iterate through chains
-        for chain in chains:
-            #calculate chain cost
-            chainCost = 0
-            #iterate through requests in chain
-            for i, requestIndex in enumerate(chain):
-                #check if location changed
-                if i > 0:
-                    lastPointLocation = self.getNextPointLocation(R, chain[i - 1])
-                    currentPointLocation = self.getNextPointLocation(R, requestIndex)
-                    if lastPointLocation != currentPointLocation:
-                        #update current time
-                        currentTime = currentTime + self.timeMatrix[lastPointLocation][currentPointLocation]
-                #if request is pickup, add time current_time - request_time to chain cost
-                if R[requestIndex][4] == "Pickup":
-                    chainCost += currentTime - R[requestIndex][0]
-                #if request is dropoff, add time current_time - pickup time - Tod to chain cost
-                elif R[requestIndex][4] == "Dropoff":
-                    Tod = self.timeMatrix[R[requestIndex][1]][R[requestIndex][2]]
-                    chainCost += currentTime - R[requestIndex][5] - Tod
-            #reset current time
-            currentTime = originalCurrentTime
-            #add chain cost to list of chain costs
-            chainCosts.append(chainCost)
-
-        return sum(chainCosts)
+        #return the minimum cost
+        return min(order_costs)
 
     
     def value(self, state):

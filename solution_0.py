@@ -12,6 +12,12 @@ import search
 
 # TODO: Replace list and tuple member access with getters and setters, that is replace request[0] with request.getTime() for example
 
+# TODO: Check if it is possible to use a dictionary to store the request list of each vehicle, where the key is the vehicle index and the value is the list of requests
+
+# TODO: override node methods to use tuples instead of lists
+
+# TODO: maybe change to object oriented programming
+
 #=======================================================================================================================================
 
 # TODO: Check how input file is passed (argument or stdin)
@@ -46,7 +52,6 @@ class FleetProblem(search.Problem):
         self.vehicleList = []
         self.J = 0
         self.numberOfRequests = 0
-
 
     #readLines method that ignores lines that start with '#'
     #reads lines until it finds a line that doesn't start with '#'
@@ -87,7 +92,8 @@ class FleetProblem(search.Problem):
             R.append((r[0], int(r[1]), int(r[2]), int(r[3]), "Pickup", None))
         R = tuple(R)
         T = 0
-        self.initial = (V, R, T)
+        P = None
+        self.initial = (V, R, T, P)
         pass
 
     def readP(self, fh, pLine):
@@ -167,6 +173,11 @@ class FleetProblem(search.Problem):
         #state timestamp equals action timestamp
         newT = action[3]
         #add action to path
+        if state[3] != None:
+            newP = list(state[3])
+            newP.append(action)
+        else:
+            newP = [action,]
         if action[0] == "Pickup":
 
             #if vehicle request list is empty, simply create list with a single entry
@@ -187,10 +198,10 @@ class FleetProblem(search.Problem):
         else:
     
             #convert to list and remove completed request from vehicle list
-
-
-
-
+            print("newV[vehicleInUseIndex][3]: ")
+            print(newV[vehicleInUseIndex][3])
+            print("newR[requestFulfilledIndex]: ")
+            print(newR[requestFulfilledIndex])
             originalRequest = newR[requestFulfilledIndex]
             newV[vehicleInUseIndex][3].remove((originalRequest[0], originalRequest[1], originalRequest[2], originalRequest[3], "Pickup", None))
             #at the end convert back to tuple so that it is hashable
@@ -208,25 +219,44 @@ class FleetProblem(search.Problem):
             if newV[i][3] != None:
                 newV[i][3] = tuple(newV[i][3])
             newV[i] = tuple(newV[i])
+        if newP != None:
+            for i in range(len(newP)):
+                newP[i] = tuple(newP[i])
         newV = tuple(newV)
         newR = tuple(newR)
-        newState = (newV, newR, newT)
-
-
-
-
-
-
+        newP = tuple(newP)
+        newState = (newV, newR, newT, newP)
+        print("\nExploring Action:")
+        print(action)
+        print("newV:")
+        for v in newV:
+            print(v)
+        print("newR:")
+        for r in newR:
+            print(r)
+        print("newP: ")
+        if newP != None:
+            for p in newP:
+                print(p)
+        print("end of newP")
         return newState
     
     def actions(self, state):
         V = state[0]
         R = state[1]
         T = state[2]
-
-
-
-    
+        P = state[3]
+        print("\nCurrent State:")
+        print("V:")
+        for v in V:
+            print(v)
+        print("R:")
+        for r in R:
+            print(r)
+        print("P: ")
+        if P != None:
+            for p in P:
+                print(p)
         possibleActions = []
         for request in R:
             if request[4] == "Pickup":
@@ -248,8 +278,8 @@ class FleetProblem(search.Problem):
             if request[4] == "Dropoff":
                 for vehicle in V:
                     #the only vehicle capable of preforming a request with "Dropoff" status is the vehicle with the corresponding request with "Pickup" status in its requestList
-
-
+                    print("\n\nvehicle request list: ")                    
+                    print(vehicle[3])
                     if vehicle[3] != None:
                         if (request[0], request[1], request[2], request[3], "Pickup", None) in vehicle[3]:
                             #check if vehicle can reach the pickup location after request has been triggered
@@ -260,8 +290,9 @@ class FleetProblem(search.Problem):
                             if projectedTime >= request[0]:
                                 possibleActions.append(["Dropoff", V.index(vehicle), R.index(request), projectedTime])
         possibleActions = tuple(possibleActions)
-
-
+        print("Possible Actions: ")
+        for a in possibleActions:
+            print(a)
         return possibleActions
                 
     def goal_test(self, state):
@@ -271,28 +302,28 @@ class FleetProblem(search.Problem):
         return True
     
     def solve(self):
-        path = search.uniform_cost_search(self).solution()
-        for i in range(len(path)):
-            path[i] = tuple(path[i])
-            
-        return path
+        return search.uniform_cost_search(self)
 
     def path_cost(self, c, state1, action, state2):
         request = state1[1][action[2]]
-
+        
+        print(action, request)
         if(action[0] == "Pickup"):
             delay = action[3] - request[0]
+            print("delay: ")
+            print(delay)
             return c + delay
         else:
             Tod = self.timeMatrix[request[1]][request[2]]
-
-
-
+            print(Tod)
+            print("\n\n")
+            print("here")
             for v in state1[0]:
                 if v[3] != None:
-
+                    print("state is not none")
                     delay = action[3] - request[5] - Tod
-
+                    print("delay: ")
+                    print(delay)
                     return c + delay
         
 
@@ -309,7 +340,7 @@ class FleetProblem(search.Problem):
         except Exception as e:
             print(e)
         except:
-            print("No dropoff actions in provided solution.")
+            print("Error with provided solution.")
             sys.exit(1)
 
         #iterate through sol list of tuples and calculate total cost
@@ -323,9 +354,9 @@ class FleetProblem(search.Problem):
             pickUpPointIndex = actionRequest[1]
             dropOffPointIndex = actionRequest[2]
             Tod = self.timeMatrix[int(pickUpPointIndex)][int(dropOffPointIndex)]
-
-
-
+            print(pickUpPointIndex)
+            print(dropOffPointIndex)
+            print(Tod)
 
             dr = td - t - Tod
 

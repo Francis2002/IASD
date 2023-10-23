@@ -95,7 +95,7 @@ class FleetProblem(search.Problem):
                     sumOfNonZeroElements += self.timeMatrix[i][j]
         self.standardTimeUnit = sumOfNonZeroElements / numberOfNonZeroElements
         #standard time unit adjustment
-        self.standardTimeUnit = self.standardTimeUnit * 1
+        self.standardTimeUnit = self.standardTimeUnit * 10
 
         #create initial state
         V = []
@@ -274,131 +274,68 @@ class FleetProblem(search.Problem):
             if vehicle[2] > currentTime:
                 currentTime = vehicle[2]
 
-        #create chains of requests that have the next stage (pickup or dropoff) point in proximity, that is:
-        #if a request has status "Pickup", the next point is the pickup point
-        #if a request has status "Dropoff", the next point is the dropoff point
-        #if a request has status "Completed", it has no next point
-        #chains must have requests where the next point is in both time and location proximity as another request's next point
-        #proximity in time means that the difference between the request time and the next point time is less than the standard time unit
-        #we must have in mind that pickup actions can only be done if the request time is less than the pickup action timestamp
-        #we must have in mind that dropoff actions can only be done if the corresponding pickup action has been done
-
-        #create list of requests in proximity
-        #on each index, we have a list of requests that are in proximity with the request in the index
-        requestsInProximity = []
-        for i in range(len(R)):
-            requestsInProximity.append([])
-        for i in range(len(R)):
-            #determine next point for requests index i
-            inextPoint = self.getNextPointLocation(R, i)
-            for j in range(len(R)):
-                #determine next point for requests index j
-                jnextPoint = self.getNextPointLocation(R, j)
-                #check if requests are in proximity
-                if i != j and inextPoint != None and jnextPoint != None:
-                    #check if next points are in proximity
-                    if self.timeMatrix[inextPoint][jnextPoint] == 0.0:
-                        requestsInProximity[i].append(j)
-        
-        #for each location proximity list, remove requests that are not in time proximity
-        #create minimum request execution time list
-        minimumRequestExecutionTime = [None]*len(R)
-        for i in range(len(R)):
-            #if request is pickup, minimum execution time is the request time, but only if the request time is more than the current time
-            if R[i][4] == "Pickup":
-                if R[i][0] > currentTime:
-                    minimumRequestExecutionTime[i] = R[i][0]
-                else:
-                    minimumRequestExecutionTime[i] = currentTime
-            #if request is dropoff, minimum execution time is the current time
-            elif R[i][4] == "Dropoff":
-                minimumRequestExecutionTime[i] = currentTime
-        
-        #for each location proximity list, remove requests that are not in time proximity
-        for index, requestList in enumerate(requestsInProximity):
-            for requestIndex in requestList:
-                if abs(minimumRequestExecutionTime[requestIndex] - minimumRequestExecutionTime[index]) > self.standardTimeUnit:
-                    requestsInProximity[index].remove(requestIndex)
-        
-        #now we have lists of requests that are in proximity
-        #we must now create chains of requests that are in proximity
-        #a chain is a list of requests where consecutive requests are in proximity with each other
-        #we must create the longest possible chains
-        
-        #create list of chains
-        chains = []
-        #create list of requests that have already been added to a chain
-        requestsAlreadyAdded = []
-        #iterate through requests
-        for i in range(len(R)):
-            #if request has not been added to a chain yet
-            if i not in requestsAlreadyAdded:
-                #check if request can be added to an existing chain
-                #iterate through chains
-                for chain in chains:
-                    #check if request is in proximity with last request in chain
-                    if i in requestsInProximity[chain[-1]]:
-                        #add request to chain
-                        chain.append(i)
-                        #add request to list of requests that have already been added to a chain
-                        requestsAlreadyAdded.append(i)
-                        break
-                #if request cannot be added to an existing chain, create new chain
-                if i not in requestsAlreadyAdded:
-                    chains.append([i])
-                    requestsAlreadyAdded.append(i)
-
-        #sort requests in each chain by location of next point
-        #baba sort
-        for chain in chains:
-            for request in chain:
-                nextPoint = self.getNextPointLocation(R, request)
-                if nextPoint != None:
-                    for i in range(len(chain)):
-                        if i != request:
-                            inextPoint = self.getNextPointLocation(R, i)
-                            if inextPoint != None:
-                                if self.timeMatrix[nextPoint][inextPoint] < self.timeMatrix[nextPoint][nextPoint]:
-                                    chain[i], chain[request] = chain[request], chain[i]
-                                    break
-
-        #now we have a list of chains
-        #we must now calculate the cost of completing every chain
-
-        #save current time
-        originalCurrentTime = currentTime
         #create list of chain costs
-        chainCosts = []
-        #iterate through chains
-        for chain in chains:
-            #calculate chain cost
-            chainCost = 0
-            #iterate through requests in chain
-            for i, requestIndex in enumerate(chain):
-                #check if location changed
-                if i > 0:
-                    lastPointLocation = self.getNextPointLocation(R, chain[i - 1])
-                    currentPointLocation = self.getNextPointLocation(R, requestIndex)
-                    if lastPointLocation != currentPointLocation:
-                        #update current time
-                        currentTime = currentTime + self.timeMatrix[lastPointLocation][currentPointLocation]
-                #if request is pickup, add time current_time - request_time to chain cost
+        cost = 0
+        for requestIndex, request in enumerate(R):
+            #iterate through requests
+            #get vehicle best suited for request
+            bestVehicleIndex = None
+            bestVehicleCost = None
+            possibleTimes = []
+            for vehicleIndex, vehicle in enumerate(V):
+                currentVehicleRoutes = []
+                currentVehicleRequestLocationList = []
+                currentVehicleTime = vehicle[2]
+                currentVehicleLocation = vehicle[1]
+                #if request is pickup, add time current_time - request_time to cost
                 if R[requestIndex][4] == "Pickup":
-                    chainCost += currentTime - R[requestIndex][0]
-                #if request is dropoff, add time current_time - pickup time - Tod to chain cost
-                elif R[requestIndex][4] == "Dropoff":
-                    Tod = self.timeMatrix[R[requestIndex][1]][R[requestIndex][2]]
-                    chainCost += currentTime - R[requestIndex][5] - Tod
-            #reset current time
-            currentTime = originalCurrentTime
-            #add chain cost to list of chain costs
-            chainCosts.append(chainCost)
+                    #if vehicle capacity is enough for request
+                    if vehicle[0] >= request[3]:
+                        pickupTime = currentVehicleTime + self.timeMatrix[vehicle[1]][request[1]]
+                    else:
+                        #iterate through all requests again
+                        for requestIndex2, request2 in enumerate(R):
+                            if request2[6] == vehicleIndex and request2[2] != request[1] and request2[2] != currentVehicleLocation and request2[2] not in currentVehicleRequestLocationList:
+                                currentVehicleRequestLocationList.append(request2[2])
+                        if currentVehicleRequestLocationList == [] and request[1] != currentVehicleLocation:
+                            currentVehicleRoutes.append((currentVehicleLocation, request[1]))
+                        elif currentVehicleRequestLocationList == [] and request[1] == currentVehicleLocation:
+                            currentVehicleRoutes.append((currentVehicleLocation))
+                        elif currentVehicleRequestLocationList != [] and request[1] != currentVehicleLocation:
+                            for length in range(1, len(currentVehicleRequestLocationList) + 1):
+                                for route in itertools.permutations(currentVehicleRequestLocationList, length):
+                                    currentVehicleRoutes.append((currentVehicleLocation, route, request[1]))
+                        else:
+                            for length in range(1, len(currentVehicleRequestLocationList) + 1):
+                                for route in itertools.permutations(currentVehicleRequestLocationList, length):
+                                    currentVehicleRoutes.append((currentVehicleLocation, route, request[1]))
+                        bestRouteLength = 999999
+                        for route in currentVehicleRoutes:
+                            routeLength = 0
+                            availableCapacity = vehicle[0]
+                            for index, location in enumerate(route):
+                                if index == 0 and currentVehicleLocation == request[1]:
+                                    continue
+                                for requestIndex2, request2 in enumerate(R):
+                                    if request2[6] == vehicleIndex and request2[2] == location:
+                                        availableCapacity += request2[3]
+                            if availableCapacity >= request[3]:
+                                for i in range(len(route) - 1):
+                                    routeLength += self.timeMatrix[route[i]][route[i + 1]]
+                                
 
-        return sum(chainCosts)
+                                if routeLength < bestRouteLength:
+                                    bestRouteLength = routeLength
+                                    bestRoute = route
+                        pickupTime = currentVehicleTime + bestRouteLength
+                    possibleTimes.append(pickupTime)
+                pickupT = min(possibleTimes)
+                cost += pickupT - request[0]
+                #if request is dropoff, add time current_time - request_time - Tod to cost
+                
 
-    
-    def value(self, state):
-        return 0
+
+        return cost
     
     def solve(self):
         # path = search.uniform_cost_search(self, display=True).solution()

@@ -95,7 +95,7 @@ class FleetProblem(search.Problem):
                     sumOfNonZeroElements += self.timeMatrix[i][j]
         self.standardTimeUnit = sumOfNonZeroElements / numberOfNonZeroElements
         #standard time unit adjustment
-        self.standardTimeUnit = self.standardTimeUnit * 1
+        self.standardTimeUnit = self.standardTimeUnit * 10
 
         #create initial state
         V = []
@@ -297,7 +297,7 @@ class FleetProblem(search.Problem):
                 #check if requests are in proximity
                 if i != j and inextPoint != None and jnextPoint != None:
                     #check if next points are in proximity
-                    if self.timeMatrix[inextPoint][jnextPoint] == 0.0:
+                    if self.timeMatrix[inextPoint][jnextPoint] < self.standardTimeUnit:
                         requestsInProximity[i].append(j)
         
         #for each location proximity list, remove requests that are not in time proximity
@@ -365,8 +365,6 @@ class FleetProblem(search.Problem):
         #now we have a list of chains
         #we must now calculate the cost of completing every chain
 
-        #save current time
-        originalCurrentTime = currentTime
         #create list of chain costs
         chainCosts = []
         #iterate through chains
@@ -375,13 +373,13 @@ class FleetProblem(search.Problem):
             chainCost = 0
             #iterate through requests in chain
             for i, requestIndex in enumerate(chain):
-                #check if location changed
+                """ #check if location changed
                 if i > 0:
                     lastPointLocation = self.getNextPointLocation(R, chain[i - 1])
                     currentPointLocation = self.getNextPointLocation(R, requestIndex)
                     if lastPointLocation != currentPointLocation:
                         #update current time
-                        currentTime = currentTime + self.timeMatrix[lastPointLocation][currentPointLocation]
+                        currentTime = currentTime + self.timeMatrix[lastPointLocation][currentPointLocation] """
                 #if request is pickup, add time current_time - request_time to chain cost
                 if R[requestIndex][4] == "Pickup":
                     chainCost += currentTime - R[requestIndex][0]
@@ -389,8 +387,6 @@ class FleetProblem(search.Problem):
                 elif R[requestIndex][4] == "Dropoff":
                     Tod = self.timeMatrix[R[requestIndex][1]][R[requestIndex][2]]
                     chainCost += currentTime - R[requestIndex][5] - Tod
-            #reset current time
-            currentTime = originalCurrentTime
             #add chain cost to list of chain costs
             chainCosts.append(chainCost)
 
