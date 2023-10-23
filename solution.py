@@ -108,6 +108,7 @@ class FleetProblem(search.Problem):
         R = tuple(R)
         T = 0
         self.initial = (V, R, T)
+        self.initial = (V, R, T)
         pass
 
     def readP(self, fh, pLine):
